@@ -218,7 +218,7 @@ class AiSalaryPredictor:
 
     def compare_models(self):
 
-        print("\Final Model Comparison\n")
+        print("\nFinal Model Comparison\n")
 
         for model, metrics in self.results.items():
             print(f"{model}")
