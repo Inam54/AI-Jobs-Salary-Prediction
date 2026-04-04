@@ -221,11 +221,10 @@ class AiSalaryPredictor:
         print("\nFinal Model Comparison\n")
 
         for model, metrics in self.results.items():
-            print(f"{model}")
+            print(f"\n{model}")
             print(f"  R2: {metrics['R2']:.4f}")
             print(f"  MAE: {metrics['MAE']:.2f}")
             print(f"  RMSE: {metrics['RMSE']:.2f}")
-            print("-" * 40)
 
         # Best model
         best_model = max(self.results, key=lambda x: self.results[x]['R2'])
