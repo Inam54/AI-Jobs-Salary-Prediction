@@ -1,6 +1,7 @@
 # Importing necessary libraries
 import numpy as np
 import pandas as pd
+import yaml
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, FunctionTransformer, StandardScaler
 from sklearn.linear_model import LinearRegression
@@ -13,9 +14,12 @@ from sklearn.tree import DecisionTreeRegressor
 
 class AiSalaryPredictor:
 
-    def __init__(self, data_path):
-        self.df = pd.read_csv(data_path)
+    def __init__(self, data):
+        self.df = pd.read_csv(data)
         self.results = {}
+        with open('config.yml', 'r') as f:
+            self.config = yaml.safe_load(f)
+        self.kf = KFold(n_splits=self.config["Kfold"]["folds"], shuffle=self.config["Kfold"]["shuffle"], random_state=self.config["Kfold"]["random_state"])
 
     def load_data(self):
         print(self.df.head())
@@ -52,16 +56,18 @@ class AiSalaryPredictor:
         return grid.best_estimator_.predict(X_test)
 
     def splitting_data(self):
+        with open('config.yml', 'r') as f:
+            config = yaml.safe_load(f)
         X = self.df.drop(["salary_usd"], axis=1)
         y = self.df["salary_usd"]
-        return train_test_split(X, y, train_size=0.8, random_state=42)
+        return train_test_split(X, y, test_size=config["data"]["test_size"], random_state=config["data"]["random_state"])
 
     def create_preprocessor(self, model_type="linear"):
 
         cat_cols = ['country', 'job_role', 'ai_specialization', 'industry', 'work_mode', 'education_required']
 
         nominal = Pipeline([
-            ("onehot", OneHotEncoder(handle_unknown='ignore'))
+            ("onehot", OneHotEncoder(handle_unknown='ignore', sparse_output=True))
         ])
 
         ordinal1 = Pipeline([
@@ -125,15 +131,12 @@ class AiSalaryPredictor:
             ("model", LinearSVR())
         ])
 
-        param_grid = {
-            'model__C': [0.01, 0.1, 1],
-            'model__epsilon': [0.01, 0.1, 0.5],
-            'model__max_iter': [1000, 2000]
-        }
-
-        kf = KFold(n_splits=5, shuffle=True, random_state=42)
-
-        grid = GridSearchCV(pipe, param_grid, cv=kf, scoring='r2', n_jobs=-1)
+        grid = GridSearchCV(pipe, 
+            param_grid=self.config["Model"]["svm"], 
+            cv=self.kf, 
+            scoring=self.config["Grid"]["scoring"], 
+            n_jobs=self.config["Grid"]["n_jobs"]
+        )
 
         X_train, X_test, y_train, y_test = self.splitting_data()
 
@@ -156,15 +159,13 @@ class AiSalaryPredictor:
             ("model", DecisionTreeRegressor(random_state=42))
         ])
 
-        param_grid = {
-            "model__max_depth": [3, 5, 10, None],
-            "model__min_samples_split": [2, 5, 10],
-            "model__min_samples_leaf": [1, 2, 4]
-        }
-
-        kf = KFold(n_splits=5, shuffle=True, random_state=42)
-
-        grid = GridSearchCV(pipe, param_grid, cv=kf, scoring="r2", n_jobs=-1)
+        grid = GridSearchCV(
+            pipe, 
+            param_grid=self.config["Model"]["decision_tree"], 
+            cv=self.kf, 
+            scoring=self.config["Grid"]["scoring"], 
+            n_jobs=self.config["Grid"]["n_jobs"]
+        )
 
         X_train, X_test, y_train, y_test = self.splitting_data()
 
@@ -187,23 +188,13 @@ class AiSalaryPredictor:
             ("model", RandomForestRegressor(n_estimators=50, random_state=42, n_jobs=-1))
         ])
 
-        param_grid = {
-            "model__n_estimators": [50, 100],
-            "model__max_depth": [None, 5, 10],
-            "model__min_samples_split": [2, 3, 5],
-            "model__min_samples_leaf": [1, 2, 3]
-        }
-
-        kf = KFold(n_splits=5, shuffle=True, random_state=42)
-
         grid = RandomizedSearchCV(
             pipe,
-            param_distributions=param_grid,
-            n_iter=10,
-            cv=kf,
-            scoring="r2",
-            n_jobs=-1,
-            random_state=42
+            param_distributions=self.config["Model"]["random_forest"],
+            cv=self.kf,
+            scoring=self.config["Grid"]["scoring"],
+            n_jobs=self.config["Grid"]["n_jobs"],
+            random_state=self.config["Grid"]["random_state"]
         )
 
         X_train, X_test, y_train, y_test = self.splitting_data()
@@ -237,7 +228,8 @@ if __name__ == "__main__":
 
     predictor.linear_regression()
     predictor.svm()
-    predictor.decision_tree()
-    predictor.random_forest()
+    # predictor.decision_tree()
+    # predictor.random_forest()
+    predictor.bagging()
 
     predictor.compare_models()
