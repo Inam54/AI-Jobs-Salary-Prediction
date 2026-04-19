@@ -219,7 +219,7 @@ class AiSalaryPredictor:
 
         # Best model
         best_model = max(self.results, key=lambda x: self.results[x]['R2'])
-        print(f"\nBest Model: {best_model}")
+        print(f'Best Model: {best_model}')
 
 if __name__ == "__main__":
 
@@ -228,8 +228,7 @@ if __name__ == "__main__":
 
     predictor.linear_regression()
     predictor.svm()
-    # predictor.decision_tree()
-    # predictor.random_forest()
-    predictor.bagging()
+    predictor.decision_tree()
+    predictor.random_forest()
 
     predictor.compare_models()
