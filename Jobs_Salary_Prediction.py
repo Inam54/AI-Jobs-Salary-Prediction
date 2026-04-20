@@ -75,7 +75,7 @@ class AiSalaryPredictor:
 
         # Best model
         best_model = max(self.results, key=lambda x: self.results[x]['R2'])
-        print(f'Best Model: {best_model}\n')
+        print(f'\nBest Model: {best_model}\n')
         return best_model
 
     def save_model(self):
@@ -238,4 +238,6 @@ if __name__ == "__main__":
     predictor.linear_regression()
     predictor.svm()
     predictor.decision_tree()
+    predictor.random_forest()
+
     predictor.save_model()
