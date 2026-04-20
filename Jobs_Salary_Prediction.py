@@ -11,6 +11,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.tree import DecisionTreeRegressor
+import joblib
 
 class AiSalaryPredictor:
 
@@ -61,6 +62,28 @@ class AiSalaryPredictor:
         X = self.df.drop(["salary_usd"], axis=1)
         y = self.df["salary_usd"]
         return train_test_split(X, y, test_size=config["data"]["test_size"], random_state=config["data"]["random_state"])
+    
+    def compare_models(self):
+
+        print("\nFinal Model Comparison\n")
+
+        for model, metrics in self.results.items():
+            print(f"\n{model}")
+            print(f"  R2: {metrics['R2']:.4f}")
+            print(f"  MAE: {metrics['MAE']:.2f}")
+            print(f"  RMSE: {metrics['RMSE']:.2f}")
+
+        # Best model
+        best_model = max(self.results, key=lambda x: self.results[x]['R2'])
+        print(f'Best Model: {best_model}\n')
+        return best_model
+
+    def save_model(self):
+
+        best_model_name = self.compare_models()
+        print(f"Saving Model: {best_model_name}")
+        best_model = joblib.dump(self.results[best_model_name], "model.pkl")
+        print(f'Model Saved as {best_model[0]}')
 
     def create_preprocessor(self, model_type="linear"):
 
@@ -207,20 +230,6 @@ class AiSalaryPredictor:
         y_pred = self.tune_model(grid, X_train, y_train, X_test)
         self.model_evaluation(y_pred, y_test, "Random Forest (After Tuning)")
 
-    def compare_models(self):
-
-        print("\nFinal Model Comparison\n")
-
-        for model, metrics in self.results.items():
-            print(f"\n{model}")
-            print(f"  R2: {metrics['R2']:.4f}")
-            print(f"  MAE: {metrics['MAE']:.2f}")
-            print(f"  RMSE: {metrics['RMSE']:.2f}")
-
-        # Best model
-        best_model = max(self.results, key=lambda x: self.results[x]['R2'])
-        print(f'Best Model: {best_model}')
-
 if __name__ == "__main__":
 
     predictor = AiSalaryPredictor('Dataset/global_ai_jobs.csv')
@@ -229,6 +238,4 @@ if __name__ == "__main__":
     predictor.linear_regression()
     predictor.svm()
     predictor.decision_tree()
-    predictor.random_forest()
-
-    predictor.compare_models()
+    predictor.save_model()
