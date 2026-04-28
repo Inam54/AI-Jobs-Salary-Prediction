@@ -18,6 +18,9 @@ class AiSalaryPredictor:
     def __init__(self, data):
         self.df = pd.read_csv(data)
         self.results = {}
+        self.trained_models = {}
+        self.X = self.df.drop(["salary_usd"], axis=1)
+        self.y = self.df["salary_usd"]
         with open('config.yml', 'r') as f:
             self.config = yaml.safe_load(f)
         self.kf = KFold(n_splits=self.config["Kfold"]["folds"], shuffle=self.config["Kfold"]["shuffle"], random_state=self.config["Kfold"]["random_state"])
@@ -48,20 +51,18 @@ class AiSalaryPredictor:
 
     def fit_model(self, pipe, X_train, y_train, X_test):
         pipe.fit(X_train, y_train)
-        return pipe.predict(X_test)
+        return pipe.predict(X_test), pipe
 
     def tune_model(self, grid, X_train, y_train, X_test):
         grid.fit(X_train, y_train)
         print("\nBest Parameters:", grid.best_params_)
         print("Best CV Score:", grid.best_score_)
-        return grid.best_estimator_.predict(X_test)
+        return grid.best_estimator_.predict(X_test), grid.best_estimator_
 
     def splitting_data(self):
         with open('config.yml', 'r') as f:
             config = yaml.safe_load(f)
-        X = self.df.drop(["salary_usd"], axis=1)
-        y = self.df["salary_usd"]
-        return train_test_split(X, y, test_size=config["data"]["test_size"], random_state=config["data"]["random_state"])
+        return train_test_split(self.X, self.y, test_size=config["data"]["test_size"], random_state=config["data"]["random_state"])
     
     def compare_models(self):
 
@@ -81,9 +82,12 @@ class AiSalaryPredictor:
     def save_model(self):
 
         best_model_name = self.compare_models()
-        print(f"Saving Model: {best_model_name}")
-        best_model = joblib.dump(self.results[best_model_name], "model.pkl")
-        print(f'Model Saved as {best_model[0]}')
+        print(f'Saving Model: {best_model_name}')
+
+        best_model = self.trained_models[best_model_name]
+
+        joblib.dump(best_model, 'model.pkl')
+        print("Model Saved as model.pkl")
 
     def create_preprocessor(self, model_type="linear"):
 
@@ -139,7 +143,8 @@ class AiSalaryPredictor:
 
         X_train, X_test, y_train, y_test = self.splitting_data()
 
-        y_pred = self.fit_model(pipe, X_train, y_train, X_test)
+        y_pred, pipe = self.fit_model(pipe, X_train, y_train, X_test)
+        self.trained_models["Linear Regression"] = pipe
 
         self.model_evaluation(y_pred, y_test, "Linear Regression")
 
@@ -164,17 +169,19 @@ class AiSalaryPredictor:
         X_train, X_test, y_train, y_test = self.splitting_data()
 
         # Before tuning
-        y_pred = self.fit_model(pipe, X_train, y_train, X_test)
+        y_pred, pipe = self.fit_model(pipe, X_train, y_train, X_test)
+        self.trained_models["SVM (Before Tuning)"] = pipe
         self.model_evaluation(y_pred, y_test, "SVM (Before Tuning)")
 
         # After tuning
-        y_pred = self.tune_model(grid, X_train, y_train, X_test)
+        y_pred, tuned_model = self.tune_model(grid, X_train, y_train, X_test)
+        self.trained_models["SVM (After Tuning)"] = tuned_model
         self.model_evaluation(y_pred, y_test, "SVM (After Tuning)")
 
     def decision_tree(self):
 
         print("\nDecision Tree")
-
+        
         preprocessor = self.create_preprocessor("tree")
 
         pipe = Pipeline([
@@ -189,15 +196,17 @@ class AiSalaryPredictor:
             scoring=self.config["Grid"]["scoring"], 
             n_jobs=self.config["Grid"]["n_jobs"]
         )
-
+        
         X_train, X_test, y_train, y_test = self.splitting_data()
 
         # Before tuning
-        y_pred = self.fit_model(pipe, X_train, y_train, X_test)
+        y_pred, pipe = self.fit_model(pipe, X_train, y_train, X_test)
+        self.trained_models["Decision Tree (Before Tuning)"] = pipe
         self.model_evaluation(y_pred, y_test, "Decision Tree (Before Tuning)")
 
         # After tuning
-        y_pred = self.tune_model(grid, X_train, y_train, X_test)
+        y_pred, tuned_model = self.tune_model(grid, X_train, y_train, X_test)
+        self.trained_models["Decision Tree (After Tuning)"] = tuned_model
         self.model_evaluation(y_pred, y_test, "Decision Tree (After Tuning)")
 
     def random_forest(self):
@@ -223,11 +232,13 @@ class AiSalaryPredictor:
         X_train, X_test, y_train, y_test = self.splitting_data()
 
         # Before tuning
-        y_pred = self.fit_model(pipe, X_train, y_train, X_test)
+        y_pred, pipe = self.fit_model(pipe, X_train, y_train, X_test)
+        self.trained_models["Random Forest (Before Tuning)"] = pipe
         self.model_evaluation(y_pred, y_test, "Random Forest (Before Tuning)")
 
         # After tuning
-        y_pred = self.tune_model(grid, X_train, y_train, X_test)
+        y_pred, tuned_model = self.tune_model(grid, X_train, y_train, X_test)
+        self.trained_models["Random Forest (After Tuning)"] = tuned_model
         self.model_evaluation(y_pred, y_test, "Random Forest (After Tuning)")
 
 if __name__ == "__main__":
@@ -238,6 +249,6 @@ if __name__ == "__main__":
     predictor.linear_regression()
     predictor.svm()
     predictor.decision_tree()
-    predictor.random_forest()
+    # predictor.random_forest()
 
     predictor.save_model()
